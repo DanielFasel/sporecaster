@@ -1,0 +1,14 @@
+---
+app: ""
+description: ""
+
+language: golang
+
+core:
+  name: ""
+  description: ""
+  path: cmd/app/main.go
+
+packages: []
+
+channels: []

@@ -1,0 +1,61 @@
+app: sporecast
+description: Sporecast defines the shape of your codebase and verifies it holds — giving AI agents the context to keep it growing without becoming messy and unmaintainable.
+
+language: golang
+
+core:
+  name: sporecast
+  kind: entry
+  description: CLI entry point, routes commands
+  files:
+    - name: main.go
+      role: Program entry, argument parsing, command dispatch
+
+packages:
+  - name: loader
+    kind: internal
+    description: Assembles agent files and writes them to the target project
+    files:
+      - name: loader.go
+        role: Reads agent files, concatenates them, writes output
+
+  - name: verify
+    kind: internal
+    description: Runs checks, collects results and prints the report
+    files:
+      - name: verify.go
+        role: Orchestration, result collection, report printing
+
+assets:
+  agents:
+    base:
+      - architect.md
+      - builder.md
+      - debugger.md
+    languages:
+      golang:
+        - architect.md
+        - builder.md
+  templates:
+    golang:
+      - spore.yaml
+
+channels: []
+
+# ── Zoom level 2 ───────────────────────────────────────────────────────────────
+
+verify/golang:
+  parent: verify
+  kind: internal
+  description: Go-specific verify checks
+  files:
+    - name: checks.go
+      role: Check functions validating spore invariants against Go source
+
+verify/rails:
+  parent: verify
+  kind: internal
+  description: Rails-specific verify checks
+  files:
+    - name: checks.go
+      role: Check functions validating spore invariants against Rails source
