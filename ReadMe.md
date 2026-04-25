@@ -1,12 +1,12 @@
-# Sporecast
+# Sporecaster
 
-> Sporecast defines the shape of your codebase and verifies it holds — giving AI agents the context to keep it growing without becoming messy and unmaintainable. Your spore is the single source of truth. The code follows.
+> The Sporecaster defines the shape of your codebase and verifies it holds — giving AI agents the context to keep it growing without becoming messy and unmaintainable. Your spore is the single source of truth. The code follows.
 
 ---
 
 ## What it is
 
-Sporecast is a spec-driven AI workflow for software development. Instead of pointing an AI at your code and hoping for the best, you define the architecture first — in a file called a **spore** — and everything flows from that.
+The Sporecaster is a spec-driven AI workflow for software development. Instead of pointing an AI at your code and hoping for the best, you define the architecture first — in a file called a **spore** — and everything flows from that.
 
 The spore describes your application: its packages, how they connect, what flows between them. The codebase is what grew from it. Sporecast keeps the two in sync.
 
