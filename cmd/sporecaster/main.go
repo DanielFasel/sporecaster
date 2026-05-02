@@ -8,6 +8,7 @@ import (
 	"github.com/DanielFasel/sporecaster/internal/verify"
 	golang "github.com/DanielFasel/sporecaster/internal/verify/golang"
 	"github.com/DanielFasel/sporecaster/internal/verify/rails"
+	"github.com/DanielFasel/sporecaster/internal/visualizer"
 )
 
 func main() {
@@ -36,12 +37,29 @@ func main() {
 		if !verify.Run(checker, s, ".") {
 			os.Exit(1)
 		}
+
+	case "inspect":
+		path := "spore.yaml"
+		if len(os.Args) > 2 {
+			path = os.Args[2]
+		}
+		s, err := loader.Load(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		addr := ":7171"
+		fmt.Printf("visualizing spore: %s\n", s.App)
+		fmt.Printf("serving at http://localhost%s\n", addr)
+		if err := visualizer.Serve(s, addr); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+
 	case "init":
 		fmt.Fprintln(os.Stderr, "init: not yet implemented")
 		os.Exit(1)
-	case "inspect":
-		fmt.Fprintln(os.Stderr, "inspect: not yet implemented")
-		os.Exit(1)
+
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
 		printUsage()
@@ -64,5 +82,5 @@ func printUsage() {
 	fmt.Println("usage:")
 	fmt.Println("  sporecaster verify [path]   verify codebase against spore.yaml")
 	fmt.Println("  sporecaster init            scaffold a new spore-managed project")
-	fmt.Println("  sporecaster inspect [path]  launch web visualizer (deferred)")
+	fmt.Println("  sporecaster inspect [path]  launch web visualizer")
 }

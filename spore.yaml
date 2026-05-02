@@ -97,8 +97,20 @@ packages:
   - name: visualizer
     kind: internal
     description: >
-      Serves a local web UI for exploring a spore visually — packages, their
-      connections, and the current verification status. Deferred; placeholder only.
+      Entry point for the local web UI. Exports Serve, which starts an HTTP
+      server on the given address and blocks until interrupted. Wires the
+      spore data to the visualizer/server handler.
+    imports:
+      - spore
+      - visualizer/server
+
+  - name: visualizer/server
+    parent: visualizer
+    kind: internal
+    description: >
+      HTTP handler for the visualizer UI. Embeds static assets (index.html,
+      style.css, viz.js) and serves a /api/spore JSON endpoint that the
+      frontend reads to render the package tree.
     imports:
       - spore
 

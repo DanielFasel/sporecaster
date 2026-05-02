@@ -15,11 +15,13 @@ func Load(path string) (*spore.Spore, error) {
 	}
 
 	var raw struct {
-		App         string          `yaml:"app"`
-		Description string          `yaml:"description"`
-		Language    string          `yaml:"language"`
-		Core        spore.Core      `yaml:"core"`
-		Packages    []spore.Package `yaml:"packages"`
+		App           string               `yaml:"app"`
+		Description   string               `yaml:"description"`
+		Language      string               `yaml:"language"`
+		ErrorHandling spore.ErrorHandling  `yaml:"error_handling"`
+		Core          spore.Core           `yaml:"core"`
+		Packages      []spore.Package      `yaml:"packages"`
+		Channels      []spore.Channel      `yaml:"channels"`
 	}
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
@@ -32,10 +34,12 @@ func Load(path string) (*spore.Spore, error) {
 	}
 
 	return &spore.Spore{
-		App:         raw.App,
-		Description: raw.Description,
-		Language:    raw.Language,
-		Core:        raw.Core,
-		Packages:    raw.Packages,
+		App:           raw.App,
+		Description:   raw.Description,
+		Language:      raw.Language,
+		ErrorHandling: raw.ErrorHandling,
+		Core:          raw.Core,
+		Packages:      raw.Packages,
+		Channels:      raw.Channels,
 	}, nil
 }
