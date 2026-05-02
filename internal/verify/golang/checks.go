@@ -5,37 +5,28 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DanielFasel/sporecaster/internal/loader"
+	"github.com/DanielFasel/sporecaster/internal/spore"
+	"github.com/DanielFasel/sporecaster/internal/verify"
 )
 
-type Result struct {
-	Label  string
-	OK     bool
-	Issues []string
-}
+type Checker struct{}
 
-// Run checks that every package and file declared in the spore exists on disk.
-func Run(spore *loader.Spore, root string) []Result {
-	var results []Result
+func (c Checker) Run(s *spore.Spore, root string) []verify.Result {
+	var results []verify.Result
 
-	corePath := filepath.Join(root, "cmd", spore.Core.Name)
-	results = append(results, checkPackage(spore.Core.Name+" (core)", corePath, spore.Core.Files))
+	corePath := filepath.Join(root, "cmd", s.Core.Name)
+	results = append(results, checkPackage(s.Core.Name+" (core)", corePath, s.Core.Files))
 
-	for _, pkg := range spore.Packages {
-		pkgPath := filepath.Join(root, "internal", pkg.Name)
+	for _, pkg := range s.Packages {
+		pkgPath := filepath.Join(root, "internal", filepath.FromSlash(pkg.Name))
 		results = append(results, checkPackage(pkg.Name, pkgPath, pkg.Files))
-	}
-
-	for _, sub := range spore.SubPackages {
-		subPath := filepath.Join(root, "internal", filepath.FromSlash(sub.Key))
-		results = append(results, checkPackage(sub.Key, subPath, sub.Files))
 	}
 
 	return results
 }
 
-func checkPackage(label, dir string, files []loader.File) Result {
-	r := Result{Label: label, OK: true}
+func checkPackage(label, dir string, files []spore.File) verify.Result {
+	r := verify.Result{Label: label, OK: true}
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		r.OK = false

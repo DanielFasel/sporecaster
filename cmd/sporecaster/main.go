@@ -1,30 +1,68 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
 	"github.com/DanielFasel/sporecaster/internal/loader"
 	"github.com/DanielFasel/sporecaster/internal/verify"
+	golang "github.com/DanielFasel/sporecaster/internal/verify/golang"
+	"github.com/DanielFasel/sporecaster/internal/verify/rails"
 )
 
 func main() {
-	doVerify := flag.Bool("verify", false, "verify the spore against the codebase")
-	flag.Parse()
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
 
-	if *doVerify {
-		spore, err := loader.Load("spore.yaml")
+	switch os.Args[1] {
+	case "verify":
+		path := "spore.yaml"
+		if len(os.Args) > 2 {
+			path = os.Args[2]
+		}
+		s, err := loader.Load(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("verifying spore: %s\n\n", spore.App)
-		if !verify.Run(spore, ".") {
+		checker, err := checkerFor(s.Language)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
-		return
+		fmt.Printf("verifying spore: %s\n\n", s.App)
+		if !verify.Run(checker, s, ".") {
+			os.Exit(1)
+		}
+	case "init":
+		fmt.Fprintln(os.Stderr, "init: not yet implemented")
+		os.Exit(1)
+	case "inspect":
+		fmt.Fprintln(os.Stderr, "inspect: not yet implemented")
+		os.Exit(1)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		printUsage()
+		os.Exit(1)
 	}
+}
 
-	flag.Usage()
+func checkerFor(language string) (verify.Checker, error) {
+	switch language {
+	case "golang":
+		return golang.Checker{}, nil
+	case "rails":
+		return rails.Checker{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported language: %s", language)
+	}
+}
+
+func printUsage() {
+	fmt.Println("usage:")
+	fmt.Println("  sporecaster verify [path]   verify codebase against spore.yaml")
+	fmt.Println("  sporecaster init            scaffold a new spore-managed project")
+	fmt.Println("  sporecaster inspect [path]  launch web visualizer (deferred)")
 }
