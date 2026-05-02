@@ -74,6 +74,15 @@ func (c Checker) Run(s *spore.Spore, root string) []verify.Result {
 		}
 	}
 
+	// ── Zoom 3: exports ────────────────────────────────────────────────
+
+	for _, pkg := range s.Packages {
+		pkgPath := filepath.Join(root, "internal", filepath.FromSlash(pkg.Name))
+		if dirExists(pkgPath) && len(pkg.Exports) > 0 {
+			results = append(results, checkExports(pkg.Name, pkgPath, pkg.Exports))
+		}
+	}
+
 	// error handling: sentinel errors must be exported
 	if s.ErrorHandling.SentinelsAreExported {
 		if dirExists(corePath) {
@@ -289,6 +298,78 @@ func checkExportedSentinels(label, dir string) verify.Result {
 					}
 				}
 			}
+		}
+	}
+
+	return r
+}
+
+// ── zoom 3 checks ────────────────────────────────────────────────────────────
+
+func checkExports(label, dir string, declared []spore.Export) verify.Result {
+	r := verify.Result{Zoom: 3, Label: label + ": exports", OK: true}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, dir, nil, 0)
+	if err != nil {
+		r.OK = false
+		r.Issues = append(r.Issues, fmt.Sprintf("parse error: %v", err))
+		return r
+	}
+
+	// collect exported top-level symbols from code
+	actual := map[string]string{} // name → kind
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			for _, decl := range file.Decls {
+				switch d := decl.(type) {
+				case *ast.FuncDecl:
+					if d.Recv == nil && d.Name.IsExported() {
+						actual[d.Name.Name] = "func"
+					}
+				case *ast.GenDecl:
+					if d.Tok != token.TYPE {
+						continue
+					}
+					for _, spec := range d.Specs {
+						ts, ok := spec.(*ast.TypeSpec)
+						if !ok || !ts.Name.IsExported() {
+							continue
+						}
+						switch ts.Type.(type) {
+						case *ast.StructType:
+							actual[ts.Name.Name] = "struct"
+						case *ast.InterfaceType:
+							actual[ts.Name.Name] = "interface"
+						default:
+							actual[ts.Name.Name] = "type"
+						}
+					}
+				}
+			}
+		}
+	}
+
+	want := map[string]string{}
+	for _, e := range declared {
+		want[e.Name] = e.Kind
+	}
+
+	for name, wantKind := range want {
+		gotKind, exists := actual[name]
+		if !exists {
+			r.OK = false
+			r.Issues = append(r.Issues, fmt.Sprintf("%s: not found (want %s)", name, wantKind))
+		} else if gotKind != wantKind {
+			r.OK = false
+			r.Issues = append(r.Issues, fmt.Sprintf("%s: is %s, want %s", name, gotKind, wantKind))
+		}
+	}
+
+	for name := range actual {
+		if _, declared := want[name]; !declared {
+			r.OK = false
+			r.Issues = append(r.Issues, fmt.Sprintf("%s: exported but not declared in spec", name))
 		}
 	}
 

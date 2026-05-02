@@ -47,6 +47,23 @@ packages:
       the parser, the verifier, and the language checkers all depend on spore, not on
       each other.
     imports: []
+    exports:
+      - name: File
+        kind: struct
+      - name: Core
+        kind: struct
+      - name: Package
+        kind: struct
+      - name: Export
+        kind: struct
+      - name: ErrorHandling
+        kind: struct
+      - name: Command
+        kind: struct
+      - name: Channel
+        kind: struct
+      - name: Spore
+        kind: struct
 
   - name: loader
     kind: internal
@@ -57,6 +74,9 @@ packages:
       converts text into the shared type tree.
     imports:
       - spore
+    exports:
+      - name: Load
+        kind: func
 
   - name: verify
     kind: internal
@@ -69,6 +89,13 @@ packages:
       contract and the output.
     imports:
       - spore
+    exports:
+      - name: Result
+        kind: struct
+      - name: Checker
+        kind: interface
+      - name: Run
+        kind: func
 
   - name: verify/golang
     parent: verify
@@ -81,6 +108,9 @@ packages:
     imports:
       - spore
       - verify
+    exports:
+      - name: Checker
+        kind: struct
 
   - name: verify/rails
     parent: verify
@@ -93,6 +123,9 @@ packages:
     imports:
       - spore
       - verify
+    exports:
+      - name: Checker
+        kind: struct
 
   - name: visualizer
     kind: internal
@@ -103,6 +136,9 @@ packages:
     imports:
       - spore
       - visualizer/server
+    exports:
+      - name: Serve
+        kind: func
 
   - name: visualizer/server
     parent: visualizer
@@ -113,6 +149,9 @@ packages:
       frontend reads to render the package tree.
     imports:
       - spore
+    exports:
+      - name: Handler
+        kind: func
 
 assets:
   agents:

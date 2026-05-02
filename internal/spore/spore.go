@@ -13,6 +13,11 @@ type Core struct {
 	Imports     []string `yaml:"imports"     json:"imports"`
 }
 
+type Export struct {
+	Name string `yaml:"name" json:"name"`
+	Kind string `yaml:"kind" json:"kind"`
+}
+
 type Package struct {
 	Name        string   `yaml:"name"        json:"name"`
 	Parent      string   `yaml:"parent"      json:"parent"`
@@ -20,6 +25,7 @@ type Package struct {
 	Description string   `yaml:"description" json:"description"`
 	Files       []File   `yaml:"files"       json:"files"`
 	Imports     []string `yaml:"imports"     json:"imports"`
+	Exports     []Export `yaml:"exports"     json:"exports"`
 }
 
 type ErrorHandling struct {

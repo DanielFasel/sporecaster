@@ -124,6 +124,51 @@ h1 {
   color: #3730a3;
 }
 
+/* ── exports (click-to-expand) ──────────── */
+
+.exports-toggle {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.exports-section {
+  display: none;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.exports-section.open {
+  display: block;
+}
+
+.exports-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+}
+
+.export-name {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.export-kind-struct    { background: #e0e7ff; color: #3730a3; }
+.export-kind-interface { background: #ede9fe; color: #6d28d9; }
+.export-kind-func      { background: #d1fae5; color: #065f46; }
+
 /* ── channels ────────────────────────────── */
 
 #channels-section {

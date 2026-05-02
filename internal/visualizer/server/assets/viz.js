@@ -20,12 +20,10 @@ async function render() {
 
   const tree = document.getElementById('tree');
 
-  // core first
   if (spore.core) {
     tree.appendChild(makeCard({ ...spore.core, isCore: true }, byParent));
   }
 
-  // top-level packages
   for (const pkg of byParent[''] || []) {
     tree.appendChild(makeCard(pkg, byParent));
   }
@@ -41,6 +39,7 @@ function makeCard(pkg, byParent) {
   const card = document.createElement('div');
   card.className = 'card' + (pkg.isCore ? ' core' : '');
 
+  // ── header ──────────────────────────────
   const header = document.createElement('div');
   header.className = 'card-header';
 
@@ -56,8 +55,17 @@ function makeCard(pkg, byParent) {
     header.appendChild(kind);
   }
 
+  const hasExports = pkg.exports && pkg.exports.length > 0;
+  if (hasExports) {
+    const toggle = document.createElement('span');
+    toggle.className = 'exports-toggle';
+    toggle.textContent = '▸';
+    header.appendChild(toggle);
+  }
+
   card.appendChild(header);
 
+  // ── description ─────────────────────────
   if (pkg.description) {
     const desc = document.createElement('p');
     desc.className = 'pkg-desc';
@@ -65,6 +73,7 @@ function makeCard(pkg, byParent) {
     card.appendChild(desc);
   }
 
+  // ── imports ──────────────────────────────
   if (pkg.imports && pkg.imports.length > 0) {
     const row = document.createElement('div');
     row.className = 'imports';
@@ -81,7 +90,40 @@ function makeCard(pkg, byParent) {
     card.appendChild(row);
   }
 
-  // sub-packages nested inside this card
+  // ── exports (collapsed by default) ───────
+  if (hasExports) {
+    const section = document.createElement('div');
+    section.className = 'exports-section';
+
+    const expLabel = document.createElement('div');
+    expLabel.className = 'exports-label';
+    expLabel.textContent = 'exports';
+    section.appendChild(expLabel);
+
+    for (const exp of pkg.exports) {
+      const row = document.createElement('div');
+      row.className = 'export-row';
+      const expName = document.createElement('span');
+      expName.className = 'export-name';
+      expName.textContent = exp.name;
+      const expKind = document.createElement('span');
+      expKind.className = 'badge export-kind-' + exp.kind;
+      expKind.textContent = exp.kind;
+      row.appendChild(expName);
+      row.appendChild(expKind);
+      section.appendChild(row);
+    }
+
+    card.appendChild(section);
+
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', () => {
+      const open = section.classList.toggle('open');
+      header.querySelector('.exports-toggle').textContent = open ? '▾' : '▸';
+    });
+  }
+
+  // ── sub-packages ─────────────────────────
   const children = byParent[pkg.name];
   if (children && children.length > 0) {
     const group = document.createElement('div');

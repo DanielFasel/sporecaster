@@ -66,6 +66,8 @@ func zoomLabel(z int) string {
 		return "skeleton"
 	case 2:
 		return "connections"
+	case 3:
+		return "exports"
 	default:
 		return fmt.Sprintf("zoom %d", z)
 	}
