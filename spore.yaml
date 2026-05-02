@@ -6,9 +6,10 @@ description: >
   files and project templates that AI agents use as primary context when working inside
   a Sporecast-managed project.
 language: golang
+go_layout: internal             # packages (other than core) live under internal/
 
 error_handling:
-  terminates_at: main
+  terminates_at: main           # The named package MAY call os.Exit; all others MUST NOT.
   strategy: >
     All packages return errors to their callers, wrapping with %w to preserve the
     chain. main converts any returned error into a message on stderr and exits with
@@ -21,6 +22,8 @@ error_handling:
 core:
   name: sporecaster
   kind: entry
+  go_path: cmd/sporecaster      # directory containing the entry package, relative to root
+  go_package: main              # Go package declaration expected in those files
   description: >
     CLI entry point. Parses subcommands and flags, selects the appropriate language
     checker, wires dependencies, and dispatches to the relevant command handler.
@@ -45,7 +48,8 @@ packages:
       so on. Contains no logic; it is the data contract that all other packages
       pass around. Having a dedicated shared package keeps the dependency graph clean:
       the parser, the verifier, and the language checkers all depend on spore, not on
-      each other.
+      each other. All exported fields carry both yaml and json struct tags so this
+      package also serves as the JSON wire format for the visualizer API.
     imports: []
     exports:
       - name: File

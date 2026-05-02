@@ -22,6 +22,7 @@ app: my-app                    # Short identifier, usually matches the binary na
 description: >                 # One or two sentences. What problem does this solve?
   A short, plain-language description of what the application does and for whom.
 language: golang               # Target language. Drives which verify/<lang> runs.
+go_layout: internal            # packages (other than core) live under internal/
 
 
 # ── Error handling strategy ──────────────────────────────────────────────────
@@ -31,6 +32,7 @@ language: golang               # Target language. Drives which verify/<lang> run
 
 error_handling:
   terminates_at: main          # Where errors become user output and exit codes.
+                               # The named package MAY call os.Exit; all others MUST NOT.
                                # Usually `main`, sometimes an HTTP middleware,
                                # a goroutine entry point, or a job runner.
 
@@ -54,6 +56,8 @@ error_handling:
 core:
   name: my-app
   kind: entry                  # entry | internal | shared
+  go_path: cmd/my-app          # directory containing the entry package, relative to root
+  go_package: main             # Go package declaration expected in those files
   description: CLI entry point, routes commands, wires dependencies
   files:
     - name: main.go
@@ -75,7 +79,10 @@ packages:
 
   - name: spore
     kind: shared
-    description: Shared data types describing a loaded spore
+    description: >
+      Shared data types describing a loaded spore. Also the JSON wire format for
+      the visualizer API — all exported fields carry both yaml and json struct tags
+      so the JSON keys are lowercase.
     imports: []                # Empty for leaf data packages.
     files:
       - name: types.go
