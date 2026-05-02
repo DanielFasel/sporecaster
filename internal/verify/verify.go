@@ -3,8 +3,8 @@ package verify
 import (
 	"fmt"
 
-	"github.com/you/sporecast/internal/loader"
-	golang "github.com/you/sporecast/internal/verify/golang"
+	"github.com/DanielFasel/sporecaster/internal/loader"
+	golang "github.com/DanielFasel/sporecaster/internal/verify/golang"
 )
 
 // Run verifies the spore against the codebase at root and prints a report.

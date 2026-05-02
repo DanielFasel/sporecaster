@@ -1,30 +1,106 @@
-app: sporecast
-description: Sporecast defines the shape of your codebase and verifies it holds — giving AI agents the context to keep it growing without becoming messy and unmaintainable.
-
+app: sporecaster
+description: >
+  Sporecast is a spec-driven development tool for AI-assisted codebases. It lets
+  you describe the intended architecture of a project in a spore.yaml file and then
+  verify that the actual code matches what the spec says. It also ships agent markdown
+  files and project templates that AI agents use as primary context when working inside
+  a Sporecast-managed project.
 language: golang
 
+error_handling:
+  terminates_at: main
+  strategy: >
+    All packages return errors to their callers, wrapping with %w to preserve the
+    chain. main converts any returned error into a message on stderr and exits with
+    code 1. The one exception is verify: individual check failures are represented
+    as data (Result.Passed = false, with a descriptive message) rather than errors.
+    verify.Run returns an error only for setup failures — unknown language, nil
+    Checker — not for checks that fail.
+  sentinels_are_exported: true
+
 core:
-  name: sporecast
+  name: sporecaster
   kind: entry
-  description: CLI entry point, routes commands
+  description: >
+    CLI entry point. Parses subcommands and flags, selects the appropriate language
+    checker, wires dependencies, and dispatches to the relevant command handler.
+    Also embeds the shipped assets (agent markdown files, spore templates,
+    about_spore.md) and writes them to disk for the init command.
   files:
     - name: main.go
-      role: Program entry, argument parsing, command dispatch
+      role: Program entry, subcommand dispatch, dependency wiring, asset embedding
+  imports:
+    - loader
+    - verify
+    - verify/golang
+    - verify/rails
+    - visualizer
 
 packages:
+  - name: spore
+    kind: shared
+    description: >
+      The shared type vocabulary for the entire system. Owns every struct that
+      represents a parsed spec field — Spore, Package, Export, Channel, Routine, and
+      so on. Contains no logic; it is the data contract that all other packages
+      pass around. Having a dedicated shared package keeps the dependency graph clean:
+      the parser, the verifier, and the language checkers all depend on spore, not on
+      each other.
+    imports: []
+
   - name: loader
     kind: internal
-    description: Assembles agent files and writes them to the target project
-    files:
-      - name: loader.go
-        role: Reads agent files, concatenates them, writes output
+    description: >
+      Reads a spore.yaml from disk and returns a fully parsed *spore.Spore. Owns YAML
+      parsing and basic structural validation — required fields present, language
+      declared, and so on. Knows nothing about what the spec means semantically; it only
+      converts text into the shared type tree.
+    imports:
+      - spore
 
   - name: verify
     kind: internal
-    description: Runs checks, collects results and prints the report
-    files:
-      - name: verify.go
-        role: Orchestration, result collection, report printing
+    description: >
+      Defines the Checker interface — the extension point that lets new language
+      checkers be added without changing this package. Also owns the Result and Report
+      types, orchestrates a verification run by calling the Checker wired in by main,
+      aggregates results into a Report, and prints the report to the terminal.
+      Individual check logic lives in the language packages; this package owns the
+      contract and the output.
+    imports:
+      - spore
+
+  - name: verify/golang
+    parent: verify
+    kind: internal
+    description: >
+      Go-specific implementation of verify.Checker. Inspects Go source code against the
+      spec: package directories, exported symbols, import graph, interface assertions,
+      sentinel errors, and any other structural invariants the spec can declare. This is
+      where new Go checks are added as the verification suite grows.
+    imports:
+      - spore
+      - verify
+
+  - name: verify/rails
+    parent: verify
+    kind: internal
+    description: >
+      Rails-specific implementation of verify.Checker. Placeholder for now — the
+      interface is satisfied but no checks are implemented yet. Will grow to cover
+      Rails conventions (models, controllers, services, routes) as that language target
+      is developed.
+    imports:
+      - spore
+      - verify
+
+  - name: visualizer
+    kind: internal
+    description: >
+      Serves a local web UI for exploring a spore visually — packages, their
+      connections, and the current verification status. Deferred; placeholder only.
+    imports:
+      - spore
 
 assets:
   agents:
@@ -40,22 +116,29 @@ assets:
     golang:
       - spore.yaml
 
-channels: []
-
-# ── Zoom level 2 ───────────────────────────────────────────────────────────────
-
-verify/golang:
-  parent: verify
-  kind: internal
-  description: Go-specific verify checks
-  files:
-    - name: checks.go
-      role: Check functions validating spore invariants against Go source
-
-verify/rails:
-  parent: verify
-  kind: internal
-  description: Rails-specific verify checks
-  files:
-    - name: checks.go
-      role: Check functions validating spore invariants against Rails source
+channels:
+  - name: cli
+    type: cli
+    description: >
+      User-facing command-line interface. All user interaction happens through this
+      surface; there is no daemon or interactive mode.
+    commands:
+      - name: verify
+        usage: "sporecaster verify [path]"
+        description: >
+          Verify the codebase in the current directory against the spore at the given
+          path. Defaults to ./spore.yaml if path is omitted. Exits 0 on success, 1 on
+          any check failure.
+      - name: init
+        usage: "sporecaster init"
+        description: >
+          Scaffold a new spore-managed project in the current directory: writes a
+          starter spore.yaml from the built-in template, copies the agent markdown
+          files (architect, builder, debugger), and adds about_spore.md. Prompts for
+          target language if not specified via a flag.
+      - name: inspect
+        usage: "sporecaster inspect [path]"
+        description: >
+          Launch a local web visualizer for the spore at the given path. Serves an
+          interactive view of packages, their connections, and current verification
+          status. Deferred.

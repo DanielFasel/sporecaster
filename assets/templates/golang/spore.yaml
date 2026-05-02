@@ -1,14 +1,426 @@
----
-app: ""
-description: ""
+# ─────────────────────────────────────────────────────────────────────────────
+# spore.yaml — Sporecast spec template
+#
+# This file describes the SHAPE of your codebase: packages, their public APIs,
+# how they connect, and the contracts between them.
+#
+# Principle: capture every decision that, if silently changed by a code
+# generator, would cause visible churn or break callers. Implementation
+# details (function bodies, helper organization, exact error messages) belong
+# in the code, not here. A good rule of thumb — if two independent code
+# regenerations would disagree on it and you'd care which one wins, spec it.
+#
+# Unused sections can be omitted or set to [] rather than deleted, so the
+# overall shape of the file stays recognizable across projects.
+# ─────────────────────────────────────────────────────────────────────────────
 
-language: golang
+
+# ── Application metadata ─────────────────────────────────────────────────────
+# Top-level facts about what this codebase IS.
+
+app: my-app                    # Short identifier, usually matches the binary name.
+description: >                 # One or two sentences. What problem does this solve?
+  A short, plain-language description of what the application does and for whom.
+language: golang               # Target language. Drives which verify/<lang> runs.
+
+
+# ── Error handling strategy ──────────────────────────────────────────────────
+# Cross-cutting decisions about how errors flow through the app. Documenting
+# this once at the top prevents every package spec from repeating or
+# contradicting it.
+
+error_handling:
+  terminates_at: main          # Where errors become user output and exit codes.
+                               # Usually `main`, sometimes an HTTP middleware,
+                               # a goroutine entry point, or a job runner.
+
+  strategy: >                  # The app-wide pattern in plain language.
+    All packages return errors to their callers and wrap with %w to preserve
+    the chain. main converts any returned error to stderr + exit code 1.
+    Exceptions (e.g. verify collects non-fatal check failures into a Report
+    instead of returning them as errors) are noted on the relevant package.
+
+  sentinels_are_exported: true # Are ErrFoo-style sentinels part of the public
+                               # contract? If yes, renaming or removing one is
+                               # a breaking change, like renaming a function.
+
+
+# ── Core (entry point) ───────────────────────────────────────────────────────
+# The package that ties everything together. In Go this is usually `main`.
+# Entry points typically don't have `exports` (nothing imports main), but they
+# do have a role — CLI parsing, command dispatch, and wiring interfaces to
+# concrete implementations.
 
 core:
-  name: ""
-  description: ""
-  path: cmd/app/main.go
+  name: my-app
+  kind: entry                  # entry | internal | shared
+  description: CLI entry point, routes commands, wires dependencies
+  files:
+    - name: main.go
+      role: Argument parsing, command dispatch, interface wiring
 
-packages: []
+
+# ── Packages ─────────────────────────────────────────────────────────────────
+# Libraries the entry point (and other packages) use. Each entry describes:
+#   • what the package IS        — kind, description, files
+#   • what it EXPOSES            — types, functions, errors
+#   • what it CONNECTS to        — imports, dispatches_to, workflow
+# Any of these can be omitted when it truly doesn't apply.
+
+packages:
+
+  # ─── Example 1: a shared-types package ────────────────────────────────────
+  # Owns data types used across the codebase. Few or no imports; other
+  # packages depend on it. Often exports only types, no functions.
+
+  - name: spore
+    kind: shared
+    description: Shared data types describing a loaded spore
+    imports: []                # Empty for leaf data packages.
+    files:
+      - name: types.go
+        role: Type declarations, no logic
+
+    exports:
+      types:
+        - name: Spore
+          kind: struct         # struct | interface | alias
+          description: In-memory representation of a parsed spore.yaml
+          fields:              # Exported fields are part of the public contract.
+            - {name: App,       type: string}
+            - {name: Language,  type: string}
+            - {name: Packages,  type: "[]Package"}
+
+        - name: Package
+          kind: struct
+          fields:
+            - {name: Name,      type: string}
+            - {name: Kind,      type: string}
+            - {name: Imports,   type: "[]string"}
+
+      functions: []            # Data packages often export no functions.
+      errors: []
+
+
+  # ─── Example 2: an orchestrator package with an interface ────────────────
+  # Defines a behavior contract (interface) and coordinates implementations
+  # of it. Implementations live in sibling packages and are wired by `main`.
+
+  - name: verify
+    kind: internal
+    description: Runs checks, collects results, prints the report
+    imports:                   # Compile-time dependencies.
+      - spore
+      - loader
+    dispatches_to:             # Runtime dependencies wired via interfaces.
+      - verify/golang          # `verify` does NOT import these; main does.
+      - verify/rails           # Listed here so the dispatch relationship is
+                               # visible in the spec even when the compiler
+                               # doesn't see it.
+    files:
+      - name: verify.go
+        role: Orchestration, result collection, report printing
+
+    exports:
+      types:
+        - name: Checker
+          kind: interface      # Interfaces describe required behavior.
+          description: >
+            Implemented by each language-specific verify package. The
+            orchestrator holds a Checker and calls Run to collect results.
+          methods:
+            - "Run(spore *spore.Spore) []Result"
+
+        - name: Result
+          kind: struct
+          description: Outcome of a single check
+          fields:
+            - {name: Check,    type: string}
+            - {name: Passed,   type: bool}
+            - {name: Location, type: string}
+            - {name: Message,  type: string}
+
+        - name: Report
+          kind: struct
+          description: Aggregated results from a verify run
+          fields:
+            - {name: Results, type: "[]Result"}
+            - {name: Passed,  type: int}
+            - {name: Failed,  type: int}
+
+      functions:
+        - name: Run
+          signature: "Run(c Checker, s *spore.Spore) (*Report, error)"
+          description: >
+            Runs the given Checker against the spore. Returns a Report of
+            results. Returns error ONLY for setup failures (unknown language,
+            checker misconfiguration). Individual check failures are data
+            (Result.Passed=false), not errors.
+
+        - name: Print
+          signature: "Print(w io.Writer, r *Report)"
+          description: Writes a human-readable report to w.
+
+      errors:
+        - name: ErrUnknownLanguage
+          kind: sentinel       # sentinel | type
+          description: >
+            Returned when the spore declares a language with no registered
+            Checker. Callers check with errors.Is.
+
+        # Example of a custom error TYPE (when an error needs to carry data):
+        # - name: ValidationError
+        #   kind: type
+        #   description: Carries field-level detail about an invalid spore.
+        #   fields:
+        #     - {name: Field, type: string}
+        #     - {name: Msg,   type: string}
+
+    workflow:                  # Cross-package call sequence. Include when it
+                               # clarifies how packages collaborate; skip for
+                               # trivial flow. Keep to package-boundary steps,
+                               # NOT internal algorithms.
+      - main reads the spore path from CLI args
+      - main calls loader.Load to parse the spore
+      - main selects the Checker for the spore's language
+      - main calls verify.Run with the Checker and Spore
+      - verify.Run invokes Checker.Run and aggregates Results into a Report
+      - main passes the Report to verify.Print
+
+
+  # ─── Example 3: an interface implementation ──────────────────────────────
+  # A sibling package providing one concrete implementation of an interface
+  # defined elsewhere. The `implements` field documents the contract; in code
+  # it is backed by a compile-time assertion (`var _ verify.Checker = ...`).
+
+  - name: verify/golang
+    parent: verify             # Nested packages list their parent for clarity.
+    kind: internal
+    description: Go-specific verify checks
+    imports:
+      - spore
+      - verify                 # Imported so we can reference verify.Checker
+                               # and verify.Result in our signatures.
+    files:
+      - name: checker.go
+        role: Checker implementation and Go-specific check functions
+
+    exports:
+      types:
+        - name: Checker
+          kind: struct
+          description: Go-language Checker implementation
+          fields: []           # No configuration today; may gain some later.
+          implements:          # Interface contracts this type satisfies.
+            - verify.Checker   # Enforced at compile time at the wiring site
+                               # (and, by convention, by a `var _` line in
+                               # this package).
+
+      functions:
+        - name: New
+          signature: "New() *Checker"
+          description: Constructs a Go Checker. Does not touch the filesystem.
+
+      errors: []
+
+
+  # ─── Example 4: a package that runs goroutines ───────────────────────────
+  # Demonstrates how concurrent routines and Go channels are specified.
+  # The `routines` block lists each goroutine the package spawns, what
+  # triggers it, which channels it reads/writes, and how it terminates.
+  # A routine without a clear termination condition is usually a bug —
+  # documenting it here forces the question to be answered.
+
+  - name: worker
+    kind: internal
+    description: Runs checks concurrently against a spore
+    imports:
+      - spore
+      - verify
+    files:
+      - name: worker.go
+        role: Worker goroutine and job/result plumbing
+
+    exports:
+      functions:
+        - name: Start
+          signature: "Start(ctx context.Context, jobs <-chan Check, results chan<- Result) error"
+          description: >
+            Spawns the worker pool. Blocks until ctx is cancelled or jobs is
+            closed and drained. Returns nil on clean shutdown, ctx.Err() on
+            cancellation.
+
+    routines:
+      - name: checkWorker
+        spawned_by: Start            # Function that calls `go ...`
+        count: configurable          # single | N | configurable
+        purpose: >
+          Reads jobs from the jobs channel, executes each check, and sends
+          the result on the results channel.
+        reads_from: [jobs]           # Channels this routine receives from
+        writes_to:  [results]        # Channels this routine sends on
+        terminates_when: >
+          The jobs channel is closed (drained loop exits) OR ctx is cancelled.
+
+
+# ── Assets ───────────────────────────────────────────────────────────────────
+# Non-code resources the app ships: agent markdown, templates, examples.
+# The exact sub-structure is project-specific — what matters is that every
+# asset this app produces or ships is accounted for. The layout below is one
+# EXAMPLE (organized by domain and then by language so new languages can add
+# their own entries without disturbing existing ones); adapt it to whatever
+# kinds of assets your app actually has.
+
+assets:
+  agents:                      # EXAMPLE: agent markdown files
+    base:                      # Language-agnostic agents used everywhere.
+      - architect.md
+      - builder.md
+      - debugger.md
+    golang:                    # Language-specific additions or overrides.
+      - architect.md
+      - builder.md
+  templates:                   # EXAMPLE: starter files written into new projects
+    golang:
+      - spore.yaml
+
+
+# ── Channels ─────────────────────────────────────────────────────────────────
+# Integration points and communication primitives. Covers BOTH external
+# contracts (how the app talks to the outside world) AND internal ones (how
+# goroutines talk to each other via Go channels). Every entry declares a
+# `type` so the code-writer AI knows what kind of contract it is.
+#
+# Common types:
+#   cli            User-facing command-line interface
+#   http           HTTP endpoint exposed or consumed
+#   websocket      Persistent bidirectional socket
+#   grpc           gRPC service
+#   go_channel     Go's built-in `chan T` concurrency primitive
+#   file           File-based input/output contract
+#   stdin_stdout   Piped I/O with other processes
+#   message_queue  External broker (NATS, Kafka, RabbitMQ, etc.)
+#
+# Empty if the app has no runtime contracts worth pinning down.
 
 channels: []
+
+  # ─── External: CLI ──────────────────────────────────────────────────────
+  # - name: cli
+  #   type: cli
+  #   description: User-facing command-line interface
+  #   commands:
+  #     - name: verify
+  #       usage: "sporecaster verify [path]"
+  #       description: Run checks against the spore at the given path
+  #     - name: init
+  #       usage: "sporecaster init"
+  #       description: Create a starter spore.yaml in the current directory
+
+  # ─── Internal: Go channel ───────────────────────────────────────────────
+  # Document Go channels that cross package boundaries OR coordinate
+  # goroutines listed in a `routines` block. Purely local channels used
+  # inside one function don't need to be specified.
+  #
+  # - name: jobs
+  #   type: go_channel
+  #   description: Work queue feeding the check workers
+  #   element_type: Check           # What flows through the channel
+  #   buffered: true                # false = unbuffered (synchronous handoff)
+  #   capacity: 16                  # Only meaningful when buffered: true
+  #   direction: one_way            # one_way | bidirectional
+  #   producers: [verify]           # Packages that send on this channel
+  #   consumers: [worker]           # Packages that receive from it
+  #   closed_by: verify             # Who closes it. Exactly one owner —
+  #                                 # prevents the "close of closed channel"
+  #                                 # panic. Use `never` for channels that
+  #                                 # are never closed (rare, usually wrong).
+  #
+  # - name: results
+  #   type: go_channel
+  #   description: Per-check outcomes flowing back from workers
+  #   element_type: Result
+  #   buffered: true
+  #   capacity: 16
+  #   direction: one_way
+  #   producers: [worker]
+  #   consumers: [verify]
+  #   closed_by: worker             # Closed after all workers finish.
+
+  # ─── External: WebSocket ────────────────────────────────────────────────
+  # - name: live_updates
+  #   type: websocket
+  #   description: Streams verify results to connected clients in real time
+  #   endpoint: "/ws/verify"
+  #   messages_out:                 # Server -> client
+  #     - {name: ResultUpdate,   payload: Result}
+  #     - {name: ReportComplete, payload: Report}
+  #   messages_in:                  # Client -> server
+  #     - {name: Subscribe, payload: SubscribeRequest}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Field reference — quick guide
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# kind (on packages)
+#   entry     A binary's entry point. In Go, the `main` package.
+#   internal  A library package internal to this app. Most packages.
+#   shared    A library package holding types consumed by many others.
+#             By convention has few imports and exports mainly types.
+#
+# kind (on types)
+#   struct    Data container with fields. Exported fields are contract.
+#   interface Behavior contract — a set of required methods.
+#   alias     A named type that reuses another's representation.
+#
+# kind (on errors)
+#   sentinel  A package-level `var ErrXxx = errors.New(...)`. Callers check
+#             with errors.Is. Use when the error is pure category, no data.
+#   type      A custom struct implementing the error interface. Use when
+#             callers need to extract fields (file, line, reason). Callers
+#             check with errors.As.
+#
+# imports vs dispatches_to
+#   imports        Compile-time: package A literally imports package B.
+#                  The Go compiler enforces this graph; cycles are errors.
+#   dispatches_to  Runtime-only: package A calls methods on an interface that
+#                  package B happens to implement, without importing B.
+#                  The wiring happens in main (or a registry). Listing it in
+#                  the spec documents an architectural link the compiler
+#                  cannot see.
+#
+# workflow
+#   Describe cross-package call sequences at the package-boundary level.
+#   Do NOT describe internal algorithms; that's implementation and belongs
+#   in the code.
+#
+# exports
+#   The public surface. Everything here is a contract with callers and should
+#   change only when the spec changes. Everything NOT here (unexported
+#   helpers, internal types, private fields) is free to churn between
+#   regenerations.
+#
+# routines (on packages)
+#   Goroutines the package spawns. Document each one's:
+#     spawned_by       Which function calls `go ...` to start it.
+#     count            single | N (a fixed number) | configurable (set by caller).
+#     purpose          What it does, in one sentence.
+#     reads_from       Channels it receives from.
+#     writes_to        Channels it sends on.
+#     terminates_when  The condition that makes the goroutine return.
+#   Specify routines only when they cross a package boundary, run for a
+#   non-trivial duration, or have a subtle lifecycle. Ad-hoc `go func()` calls
+#   for quick parallel work usually aren't worth listing.
+#
+# channels (types)
+#   go_channel     Internal Go `chan T`. Document element_type, buffered,
+#                  capacity, producers, consumers, closed_by.
+#   cli            CLI surface. Document commands, usage, flags.
+#   http / grpc    Network endpoints. Document path/method/service + payloads.
+#   websocket      Bidirectional socket. Document endpoint + messages_in/out.
+#   file           File-based contract (input format, output location).
+#   stdin_stdout   Piped I/O with other processes.
+#   message_queue  External broker. Document topic/queue + message types.
+#
+# ─────────────────────────────────────────────────────────────────────────────

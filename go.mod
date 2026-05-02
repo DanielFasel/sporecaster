@@ -1,4 +1,4 @@
-module github.com/you/sporecast
+module github.com/DanielFasel/sporecaster
 
 go 1.22
 

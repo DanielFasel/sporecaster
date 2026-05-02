@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/you/sporecast/internal/loader"
+	"github.com/DanielFasel/sporecaster/internal/loader"
 )
 
 type Result struct {

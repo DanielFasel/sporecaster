@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/you/sporecast/internal/loader"
-	"github.com/you/sporecast/internal/verify"
+	"github.com/DanielFasel/sporecaster/internal/loader"
+	"github.com/DanielFasel/sporecaster/internal/verify"
 )
 
 func main() {
