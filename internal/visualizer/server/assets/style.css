@@ -169,6 +169,57 @@ h1 {
 .export-kind-interface { background: #ede9fe; color: #6d28d9; }
 .export-kind-func      { background: #d1fae5; color: #065f46; }
 
+.export-signature {
+  font-family: var(--mono);
+  font-size: 0.70rem;
+  color: var(--muted);
+  padding: 0.1rem 0 0.3rem 0;
+}
+
+.method-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 2px solid #ede9fe;
+  margin-left: 0.25rem;
+}
+
+.method-name {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: #6d28d9;
+  min-width: 5rem;
+}
+
+.method-signature {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.field-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 2px solid var(--border);
+  margin-left: 0.25rem;
+}
+
+.field-name {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text);
+  min-width: 7rem;
+}
+
+.field-type {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 /* ── channels ────────────────────────────── */
 
 #channels-section {

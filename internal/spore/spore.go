@@ -13,9 +13,22 @@ type Core struct {
 	Imports     []string `yaml:"imports"     json:"imports"`
 }
 
-type Export struct {
+type Field struct {
 	Name string `yaml:"name" json:"name"`
-	Kind string `yaml:"kind" json:"kind"`
+	Type string `yaml:"type" json:"type"`
+}
+
+type Method struct {
+	Name      string `yaml:"name"      json:"name"`
+	Signature string `yaml:"signature" json:"signature"`
+}
+
+type Export struct {
+	Name      string   `yaml:"name"      json:"name"`
+	Kind      string   `yaml:"kind"      json:"kind"`
+	Signature string   `yaml:"signature" json:"signature"`
+	Fields    []Field  `yaml:"fields"    json:"fields"`
+	Methods   []Method `yaml:"methods"   json:"methods"`
 }
 
 type Package struct {

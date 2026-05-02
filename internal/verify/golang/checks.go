@@ -373,7 +373,214 @@ func checkExports(label, dir string, declared []spore.Export) verify.Result {
 		}
 	}
 
+	// check func signatures
+	for _, exp := range declared {
+		if exp.Kind != "func" || exp.Signature == "" {
+			continue
+		}
+		var actualSig string
+		for _, pkg := range pkgs {
+			for _, file := range pkg.Files {
+				for _, decl := range file.Decls {
+					fd, ok := decl.(*ast.FuncDecl)
+					if !ok || fd.Recv != nil || fd.Name.Name != exp.Name {
+						continue
+					}
+					actualSig = funcTypeString(fd.Type)
+				}
+			}
+		}
+		if actualSig == "" {
+			continue // already reported as missing above
+		}
+		if actualSig != exp.Signature {
+			r.OK = false
+			r.Issues = append(r.Issues, fmt.Sprintf("%s: signature %s, want %s", exp.Name, actualSig, exp.Signature))
+		}
+	}
+
+	// check interface methods
+	for _, exp := range declared {
+		if exp.Kind != "interface" || len(exp.Methods) == 0 {
+			continue
+		}
+		actualMethods := collectInterfaceMethods(pkgs, exp.Name)
+		wantMethods := map[string]string{}
+		for _, m := range exp.Methods {
+			wantMethods[m.Name] = m.Signature
+		}
+		for mname, msig := range wantMethods {
+			got, exists := actualMethods[mname]
+			if !exists {
+				r.OK = false
+				r.Issues = append(r.Issues, fmt.Sprintf("%s.%s: method not found", exp.Name, mname))
+			} else if got != msig {
+				r.OK = false
+				r.Issues = append(r.Issues, fmt.Sprintf("%s.%s: signature %s, want %s", exp.Name, mname, got, msig))
+			}
+		}
+		for mname := range actualMethods {
+			if _, ok := wantMethods[mname]; !ok {
+				r.OK = false
+				r.Issues = append(r.Issues, fmt.Sprintf("%s.%s: method present but not declared in spec", exp.Name, mname))
+			}
+		}
+	}
+
+	// check fields for struct exports
+	for _, exp := range declared {
+		if exp.Kind != "struct" || len(exp.Fields) == 0 {
+			continue
+		}
+		actualFields := collectStructFields(pkgs, exp.Name)
+		wantFields := map[string]string{}
+		for _, f := range exp.Fields {
+			wantFields[f.Name] = f.Type
+		}
+		for fname, ftype := range wantFields {
+			got, exists := actualFields[fname]
+			if !exists {
+				r.OK = false
+				r.Issues = append(r.Issues, fmt.Sprintf("%s.%s: field not found (want %s)", exp.Name, fname, ftype))
+			} else if got != ftype {
+				r.OK = false
+				r.Issues = append(r.Issues, fmt.Sprintf("%s.%s: type %s, want %s", exp.Name, fname, got, ftype))
+			}
+		}
+		for fname := range actualFields {
+			if _, ok := wantFields[fname]; !ok {
+				r.OK = false
+				r.Issues = append(r.Issues, fmt.Sprintf("%s.%s: field present but not declared in spec", exp.Name, fname))
+			}
+		}
+	}
+
 	return r
+}
+
+func collectStructFields(pkgs map[string]*ast.Package, structName string) map[string]string {
+	fields := map[string]string{}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			for _, decl := range file.Decls {
+				gd, ok := decl.(*ast.GenDecl)
+				if !ok || gd.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range gd.Specs {
+					ts, ok := spec.(*ast.TypeSpec)
+					if !ok || ts.Name.Name != structName {
+						continue
+					}
+					st, ok := ts.Type.(*ast.StructType)
+					if !ok {
+						continue
+					}
+					for _, field := range st.Fields.List {
+						t := exprString(field.Type)
+						for _, n := range field.Names {
+							if ast.IsExported(n.Name) {
+								fields[n.Name] = t
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return fields
+}
+
+func funcTypeString(ft *ast.FuncType) string {
+	params := fieldListString(ft.Params)
+	ret := returnString(ft.Results)
+	if ret == "" {
+		return "(" + params + ")"
+	}
+	return "(" + params + ") " + ret
+}
+
+func fieldListString(fl *ast.FieldList) string {
+	if fl == nil {
+		return ""
+	}
+	var parts []string
+	for _, field := range fl.List {
+		t := exprString(field.Type)
+		if len(field.Names) == 0 {
+			parts = append(parts, t)
+		} else {
+			var names []string
+			for _, n := range field.Names {
+				names = append(names, n.Name)
+			}
+			parts = append(parts, strings.Join(names, ", ")+" "+t)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+func returnString(fl *ast.FieldList) string {
+	if fl == nil || len(fl.List) == 0 {
+		return ""
+	}
+	s := fieldListString(fl)
+	if len(fl.List) > 1 {
+		return "(" + s + ")"
+	}
+	return s
+}
+
+func collectInterfaceMethods(pkgs map[string]*ast.Package, ifaceName string) map[string]string {
+	methods := map[string]string{}
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Files {
+			for _, decl := range file.Decls {
+				gd, ok := decl.(*ast.GenDecl)
+				if !ok || gd.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range gd.Specs {
+					ts, ok := spec.(*ast.TypeSpec)
+					if !ok || ts.Name.Name != ifaceName {
+						continue
+					}
+					iface, ok := ts.Type.(*ast.InterfaceType)
+					if !ok {
+						continue
+					}
+					for _, m := range iface.Methods.List {
+						ft, ok := m.Type.(*ast.FuncType)
+						if !ok {
+							continue
+						}
+						sig := funcTypeString(ft)
+						for _, n := range m.Names {
+							methods[n.Name] = sig
+						}
+					}
+				}
+			}
+		}
+	}
+	return methods
+}
+
+func exprString(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.ArrayType:
+		return "[]" + exprString(t.Elt)
+	case *ast.StarExpr:
+		return "*" + exprString(t.X)
+	case *ast.SelectorExpr:
+		return exprString(t.X) + "." + t.Sel.Name
+	case *ast.MapType:
+		return "map[" + exprString(t.Key) + "]" + exprString(t.Value)
+	default:
+		return "?"
+	}
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

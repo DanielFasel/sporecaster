@@ -112,6 +112,45 @@ function makeCard(pkg, byParent) {
       row.appendChild(expName);
       row.appendChild(expKind);
       section.appendChild(row);
+
+      if (exp.signature) {
+        const sig = document.createElement('div');
+        sig.className = 'export-signature';
+        sig.textContent = exp.signature;
+        section.appendChild(sig);
+      }
+
+      if (exp.fields && exp.fields.length > 0) {
+        for (const f of exp.fields) {
+          const frow = document.createElement('div');
+          frow.className = 'field-row';
+          const fname = document.createElement('span');
+          fname.className = 'field-name';
+          fname.textContent = f.name;
+          const ftype = document.createElement('span');
+          ftype.className = 'field-type';
+          ftype.textContent = f.type;
+          frow.appendChild(fname);
+          frow.appendChild(ftype);
+          section.appendChild(frow);
+        }
+      }
+
+      if (exp.methods && exp.methods.length > 0) {
+        for (const m of exp.methods) {
+          const mrow = document.createElement('div');
+          mrow.className = 'method-row';
+          const mname = document.createElement('span');
+          mname.className = 'method-name';
+          mname.textContent = m.name;
+          const msig = document.createElement('span');
+          msig.className = 'method-signature';
+          msig.textContent = m.signature;
+          mrow.appendChild(mname);
+          mrow.appendChild(msig);
+          section.appendChild(mrow);
+        }
+      }
     }
 
     card.appendChild(section);

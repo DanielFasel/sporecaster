@@ -50,20 +50,73 @@ packages:
     exports:
       - name: File
         kind: struct
+        fields:
+          - { name: Name, type: string }
+          - { name: Role, type: string }
       - name: Core
         kind: struct
+        fields:
+          - { name: Name,        type: string }
+          - { name: Kind,        type: string }
+          - { name: Description, type: string }
+          - { name: Files,       type: "[]File" }
+          - { name: Imports,     type: "[]string" }
       - name: Package
         kind: struct
+        fields:
+          - { name: Name,        type: string }
+          - { name: Parent,      type: string }
+          - { name: Kind,        type: string }
+          - { name: Description, type: string }
+          - { name: Files,       type: "[]File" }
+          - { name: Imports,     type: "[]string" }
+          - { name: Exports,     type: "[]Export" }
+      - name: Field
+        kind: struct
+        fields:
+          - { name: Name, type: string }
+          - { name: Type, type: string }
+      - name: Method
+        kind: struct
+        fields:
+          - { name: Name,      type: string }
+          - { name: Signature, type: string }
       - name: Export
         kind: struct
+        fields:
+          - { name: Name,      type: string }
+          - { name: Kind,      type: string }
+          - { name: Signature, type: string }
+          - { name: Fields,    type: "[]Field" }
+          - { name: Methods,   type: "[]Method" }
       - name: ErrorHandling
         kind: struct
+        fields:
+          - { name: TerminatesAt,         type: string }
+          - { name: SentinelsAreExported, type: bool }
       - name: Command
         kind: struct
+        fields:
+          - { name: Name,        type: string }
+          - { name: Usage,       type: string }
+          - { name: Description, type: string }
       - name: Channel
         kind: struct
+        fields:
+          - { name: Name,        type: string }
+          - { name: Type,        type: string }
+          - { name: Description, type: string }
+          - { name: Commands,    type: "[]Command" }
       - name: Spore
         kind: struct
+        fields:
+          - { name: App,           type: string }
+          - { name: Description,   type: string }
+          - { name: Language,      type: string }
+          - { name: ErrorHandling, type: ErrorHandling }
+          - { name: Core,          type: Core }
+          - { name: Packages,      type: "[]Package" }
+          - { name: Channels,      type: "[]Channel" }
 
   - name: loader
     kind: internal
@@ -77,6 +130,7 @@ packages:
     exports:
       - name: Load
         kind: func
+        signature: "(path string) (*spore.Spore, error)"
 
   - name: verify
     kind: internal
@@ -92,10 +146,19 @@ packages:
     exports:
       - name: Result
         kind: struct
+        fields:
+          - { name: Zoom,   type: int }
+          - { name: Label,  type: string }
+          - { name: OK,     type: bool }
+          - { name: Issues, type: "[]string" }
       - name: Checker
         kind: interface
+        methods:
+          - name: Run
+            signature: "(s *spore.Spore, root string) []Result"
       - name: Run
         kind: func
+        signature: "(checker Checker, s *spore.Spore, root string) bool"
 
   - name: verify/golang
     parent: verify
@@ -139,6 +202,7 @@ packages:
     exports:
       - name: Serve
         kind: func
+        signature: "(s *spore.Spore, addr string) error"
 
   - name: visualizer/server
     parent: visualizer
@@ -152,6 +216,7 @@ packages:
     exports:
       - name: Handler
         kind: func
+        signature: "(s *spore.Spore) http.Handler"
 
 assets:
   agents:
